@@ -1,83 +1,56 @@
+<!-- GameLobby.vue -->
 <template>
-    <div>
-      <h2>在线玩家</h2>
-      <ul>
-        <li v-for="player in onlinePlayers" :key="player.id">{{ player.name }}</li>
-      </ul>
-  
-      <h2>创建游戏房间</h2>
-      <button @click="createRoom">创建房间</button>
-  
-      <h2>游戏房间列表</h2>
-      <ul>
-        <li v-for="room in rooms" :key="room.id">
-          {{ room.name }}
-          <button @click="joinRoom(room.id)">加入房间</button>
-        </li>
-      </ul>
-    </div>
-  </template>
-  
-  <script>
-  export default {
-    data() {
-      return {
-        onlinePlayers: [], 
-        rooms: [], 
-      };
-    },
-    methods: {
-  async createRoom() {
-    try {
-      const response = await fetch('/api/create-room', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          roomName: '示例房间', 
-          creator: '玩家1', 
-        }),
-      });
+  <div>
+    <h1>游戏大厅</h1>
+    <ul>
+      <li v-for="room in rooms" :key="room.id">
+        <button @click="joinRoom(room.id)">加入房间 {{ room.id }}</button>
+      </li>
+    </ul>
+    <button @click="createRoom">创建新房间</button>
+  </div>
+</template>
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('房间创建成功:', data);
-      } else {
-        const error = await response.json();
-        console.error('房间创建失败:', error);
-      }
-    } catch (error) {
-      console.error('请求错误:', error);
-    }
+<script>
+import socket from '../websocket';
+
+export default {
+  data() {
+    return {
+      rooms: [],
+      nickname: '',
+    };
   },
+  created() {
+    this.nickname = this.$route.params.nickname;
+    socket.addEventListener('message', this.handleSocketMessage);
 
-  async joinRoom(roomId) {
-    try {
-      const response = await fetch('/api/join-room', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          roomId, 
-          player: '玩家2',
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('加入房间成功:', data);
-        // 处理加入房间成功的情况，例如跳转到游戏页面
-      } else {
-        const error = await response.json();
-        console.error('加入房间失败:', error);
-        // 处理加入房间失败的情况，例如显示错误消息
-      }
-    } catch (error) {
-      console.error('请求错误:', error);
-    }
+    // 请求房间列表
+    socket.send(JSON.stringify({ type: 'get_rooms' }));
   },
+  beforeUnmount() {
+    socket.removeEventListener('message', this.handleSocketMessage);
+  },
+  methods: {
+    handleSocketMessage(event) {
+      const data = JSON.parse(event.data);
+
+      switch (data.type) {
+        case 'rooms_list':
+          this.rooms = data.rooms;
+          break;
+        default:
+          console.log(`Unknown message type: ${data.type}`);
+      }
     },
-};   
-  </script>
+    createRoom() {
+      // 处理创建新房间逻辑
+      socket.send(JSON.stringify({ type: 'create_room', nickname: this.nickname }));
+    },
+    joinRoom(roomId) {
+      // 处理加入房间逻辑
+      socket.send(JSON.stringify({ type: 'join_room', roomId: roomId, nickname: this.nickname }));
+    },
+  },
+};
+</script>
