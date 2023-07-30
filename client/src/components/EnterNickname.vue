@@ -8,13 +8,13 @@
         <br />
         <button type="submit">进入游戏大厅</button>
       </form>
-      <router-link :to="{ name: 'GameLobby', params: { nickname: nickname } }">跳转到游戏大厅</router-link>
+      <router-link v-if="nickname"  :to="{ name: 'GameLobby', params: { nickname: nickname } }"></router-link>
     </div>
   </template>
   
   <script>
   import socket from '../websocket';
-  
+
   export default {
     data() {
       return {
@@ -29,25 +29,25 @@
     },
     methods: {
       handleSubmit() {
-        // 向服务器发送昵称
+        console.log('nickname:', this.nickname);
         socket.send(JSON.stringify({ type: 'set_nickname', nickname: this.nickname }));
   
         this.$router.push({ name: 'GameLobby', params: { nickname: this.nickname } });
       },
       handleSocketMessage(event) {
-  const data = JSON.parse(event.data);
-
-  switch (data.type) {
-    case 'nickname_accepted':
-      this.$router.push({ name: 'GameLobby', params: { nickname: this.nickname } });
-      break;
-    case 'nickname_rejected':
-      alert('昵称已被占用，请选择其他昵称');
-      break;
-    default:
-      console.log(`Unknown message type: ${data.type}`);
-  }
-},
+        const data = JSON.parse(event.data);
+        console.log('handleSocketMessage', data);
+        switch (data.type) {
+          case 'nickname_accepted':
+            this.$router.push({ name: 'GameLobby', params: { nickname: this.nickname } });
+            break;
+          case 'nickname_rejected':
+            alert('昵称已被占用，请选择其他昵称');
+            break;
+          default:
+            console.log(`Unknown message type: ${data.type}`);
+        }
+      },
     },
   };
   </script>

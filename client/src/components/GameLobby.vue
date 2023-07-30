@@ -8,6 +8,7 @@
       </li>
     </ul>
     <button @click="createRoom">创建新房间</button>
+    <router-link v-if="id" :to="{ name: 'GameRoom', params: { roomId: room.id, nickname: nickname } }">加入房间 {{ room.id }}</router-link>
   </div>
 </template>
 
@@ -25,7 +26,6 @@ export default {
     this.nickname = this.$route.params.nickname;
     socket.addEventListener('message', this.handleSocketMessage);
 
-    // 请求房间列表
     socket.send(JSON.stringify({ type: 'get_rooms' }));
   },
   beforeUnmount() {
@@ -44,11 +44,9 @@ export default {
       }
     },
     createRoom() {
-      // 处理创建新房间逻辑
       socket.send(JSON.stringify({ type: 'create_room', nickname: this.nickname }));
     },
     joinRoom(roomId) {
-      // 处理加入房间逻辑
       socket.send(JSON.stringify({ type: 'join_room', roomId: roomId, nickname: this.nickname }));
     },
   },

@@ -6,9 +6,9 @@ import DrawingBoard from '../components/DrawingBoard.vue';
 import GuessingBoard from '../components/GuessingBoard.vue';
 
 const routes = [
-  { path: '/', component: EnterNickname , name: 'EnterNickname'},
+  { path: '/enter-nickname', component: EnterNickname , name: 'EnterNickname'},
   { path: '/lobby/:nickname', component: GameLobby, name: 'GameLobby' },
-  { path: '/room/:roomId', component: GameRoom, name: 'GameRoom' },
+  { path: '/room/:roomId', component: GameRoom, name: 'GameRoom' ,props: (route) => ({ roomId: route.params.roomId, nickname: route.params.nickname }),},
   { path: '/room/:roomId/drawing', component: DrawingBoard },
   { path: '/room/:roomId/guessing', component: GuessingBoard },
 ];

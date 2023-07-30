@@ -10,6 +10,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 const wordArr = ['苹果', '香蕉', '橙子', '汽车', '自行车', '电脑', '手机'];
+const users = {};
 const rooms = [];
 
 function getRandomWord() {
@@ -17,31 +18,56 @@ function getRandomWord() {
   return wordArr[index];
 }
 
-app.post('/api/create-room', (req, res) => {
-  const { nickname } = req.body;
+function handleSetNickname(socket, nickname) {  
+  if (users[nickname]) {
+    socket.send(JSON.stringify({ type: 'nickname_rejected' }));
+  } else {
+    users[nickname] = { socket: socket };
+    socket.send(JSON.stringify({ type: 'nickname_accepted' }));
+  }
+}
 
+function handleGetRooms(socket) {
+  socket.send(JSON.stringify({ type: 'rooms_list', rooms: rooms }));
+}
+
+function handleCreateRoom(socket, nickname) {
+  // 创建一个新房间并将其添加到房间列表中
   const newRoom = {
     id: rooms.length + 1,
     name: `Room ${rooms.length + 1}`,
     creator: nickname,
-    players: [{ nickname: nickname, socket: null }],
+    players: [{ nickname: nickname, socket: socket }],
   };
   rooms.push(newRoom);
-  res.status(201).json({ message: 'room create successfully', room: newRoom });
-});
 
-app.post('/api/join-room', (req, res) => {
-  const { roomId, nickname } = req.body;
+  // 向客户端发送新房间的ID
+  socket.send(JSON.stringify({ type: 'room_created', roomId: newRoom.id }));
+}
 
+function handleJoinRoom(socket, roomId, nickname) {
+  //将用户添加到指定房间中
   const room = rooms.find((room) => room.id === roomId);
 
-  if (!room) {
-    res.status(404).json({ message: 'room not found' });
+  if (room) {
+    room.players.push({ nickname: nickname, socket: socket });
+
+    // 向客户端发送加入房间成功的消息
+    socket.send(JSON.stringify({ type: 'room_joined', roomId: roomId }));
+
+    const role = room.players.length === 1 ? 'drawer' : 'guesser';
+
+    // 发送角色分配消息
+    socket.send(JSON.stringify({ type: 'role_assigned', role: role }));
+  
   } else {
-    room.players.push({ nickname: nickname, socket: null });
-    res.status(200).json({ message: 'join the room successfully', room });
+    // 向客户端发送加入房间失败的消息
+    socket.send(JSON.stringify({ type: 'room_join_failed', message: '房间不存在' }));
   }
-});
+}
+
+let drawer = null;
+let randomWord = null;
 
 wss.on('connection', (ws) => {
   console.log('Client connected');
@@ -54,40 +80,23 @@ wss.on('connection', (ws) => {
       case 'set_nickname':
         handleSetNickname(ws, data.nickname);
         break;
-      case 'join_room':
-        const joinRoom = rooms.find((room) => room.id === data.roomId);
-        if (joinRoom) {
-          const player = joinRoom.players.find((player) => player.nickname === data.nickname);
-          if (player) {
-            player.socket = ws;
-          }
-
-          // 分配角色
-          const role = joinRoom.players.length === 1 ? 'drawer' : 'guesser';
-
-          // 发送角色分配消息
-          ws.send(JSON.stringify({ type: 'role_assigned', role: role }));
-        }
-        break;
+      case 'get_rooms':
+      handleGetRooms(ws);
+      break;
       case 'create_room':
-        const newRoom = {
-          id: rooms.length + 1,
-          name: `Room ${rooms.length + 1}`,
-          creator: data.nickname,
-          players: [{ nickname: data.nickname, socket: ws }],
-        };
-        rooms.push(newRoom);
-        ws.send(JSON.stringify({ type: 'room_created', roomId: newRoom.id }));
-        break;
+      handleCreateRoom(ws, data.nickname);
+      break;
+      case 'join_room':
+      handleJoinRoom(ws, data.roomId, data.nickname);
+      break;
       case 'draw':
-        const drawRoom = rooms.find((room) => room.id === data.roomId);
-        if (drawRoom) {
-          drawRoom.players.forEach((player) => {
-            if (player.socket !== ws && player.socket.readyState === WebSocket.OPEN) {
-              player.socket.send(message);
-            }
-          });
-        }
+        const randomWord = getRandomWord();
+        ws.send(JSON.stringify({ type: 'word', word: randomWord }));
+        wss.clients.forEach((client) => {
+          if (client !== ws && client.readyState === WebSocket.OPEN) {
+            client.send(message);
+          }
+        });
         break;
       case 'guess':
         const isCorrect = data.guess === randomWord;
@@ -100,16 +109,13 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     console.log('Client disconnected');
-    // 从房间中移除断开连接的客户端
-    rooms.forEach((room) => {
-      const index = room.players.findIndex((player) => player.socket === ws);
-      if (index !== -1) {
-        room.players.splice(index, 1);
-      }
-    });
+    if (ws === drawer) {
+      drawer = null;
+    }
   });
 });
 
 server.listen(3000, () => {
   console.log('Server is running on port 3000');
 });
+
