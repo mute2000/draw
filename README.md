@@ -9,7 +9,6 @@ vue create client
 cd client               //前端所需依赖项
 
 node server.js // 运行服务端
-
 npm run serve  // 运行客户端程序
 
 然后浏览器打开localhost:8080即可
