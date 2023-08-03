@@ -18,7 +18,7 @@ function getRandomWord() {
   return wordArr[index];
 }
 
-function handleSetNickname(socket, nickname) {  
+function handleSetNickname(socket, nickname) {
   if (users[nickname]) {
     socket.send(JSON.stringify({ type: 'nickname_rejected' }));
   } else {
@@ -32,45 +32,46 @@ function handleGetRooms(socket) {
 }
 
 function handleCreateRoom(socket, nickname) {
-  // 创建一个新房间并将其添加到房间列表中
   const newRoom = {
     id: rooms.length + 1,
     name: `Room ${rooms.length + 1}`,
     creator: nickname,
-    players: [{ nickname: nickname, socket: socket }],
+    players: [{ nickname: nickname, socket: socket, role: 'drawer' }],
   };
   rooms.push(newRoom);
 
-  // 向客户端发送新房间的ID
   socket.send(JSON.stringify({ type: 'room_created', roomId: newRoom.id }));
+
+  socket.send(JSON.stringify({ type: 'role_assigned', role: 'drawer' }));
+
+  const randomWord = getRandomWord();
+  socket.send(JSON.stringify({ type: 'word_assigned', word: randomWord }));
 }
 
 function handleJoinRoom(socket, roomId, nickname) {
-  //将用户添加到指定房间中
   const room = rooms.find((room) => room.id === roomId);
 
   if (room) {
-    room.players.push({ nickname: nickname, socket: socket });
+    const role = 'guesser';
+    room.players.push({ nickname: nickname, socket: socket, role: role });
 
-    // 向客户端发送加入房间成功的消息
     socket.send(JSON.stringify({ type: 'room_joined', roomId: roomId }));
 
-    const role = room.players.length === 1 ? 'drawer' : 'guesser';
-
-    // 发送角色分配消息
     socket.send(JSON.stringify({ type: 'role_assigned', role: role }));
-  
+    if (role === 'drawer') {
+      randomWord = getRandomWord();
+      socket.send(JSON.stringify({ type: 'word_assigned', word: randomWord }));
+    }
   } else {
-    // 向客户端发送加入房间失败的消息
     socket.send(JSON.stringify({ type: 'room_join_failed', message: '房间不存在' }));
   }
 }
 
-let drawer = null;
-let randomWord = null;
-
 wss.on('connection', (ws) => {
   console.log('Client connected');
+
+  let drawer = null;
+  let randomWord = null;
 
   ws.on('message', (message) => {
     console.log(`Received message: ${message}`);
@@ -81,17 +82,15 @@ wss.on('connection', (ws) => {
         handleSetNickname(ws, data.nickname);
         break;
       case 'get_rooms':
-      handleGetRooms(ws);
-      break;
+        handleGetRooms(ws);
+        break;
       case 'create_room':
-      handleCreateRoom(ws, data.nickname);
-      break;
+        handleCreateRoom(ws, data.nickname);
+        break;
       case 'join_room':
-      handleJoinRoom(ws, data.roomId, data.nickname);
-      break;
+        handleJoinRoom(ws, data.roomId, data.nickname);
+        break;
       case 'draw':
-        const randomWord = getRandomWord();
-        ws.send(JSON.stringify({ type: 'word', word: randomWord }));
         wss.clients.forEach((client) => {
           if (client !== ws && client.readyState === WebSocket.OPEN) {
             client.send(message);
@@ -101,7 +100,21 @@ wss.on('connection', (ws) => {
       case 'guess':
         const isCorrect = data.guess === randomWord;
         ws.send(JSON.stringify({ type: 'guessResult', isCorrect }));
+
+        wss.clients.forEach((client) => {
+          if (client !== ws && client.readyState === WebSocket.OPEN) {
+            client.send(message);
+          }
+        });
         break;
+      case 'chat':
+        wss.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+          }
+        });
+        break;
+
       default:
         console.log(`Unknown message type: ${data.type}`);
     }
@@ -118,4 +131,3 @@ wss.on('connection', (ws) => {
 server.listen(3000, () => {
   console.log('Server is running on port 3000');
 });
-

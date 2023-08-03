@@ -1,56 +1,102 @@
 <template>
-    <div>
-      <canvas ref="canvas"></canvas>
-      <div>
-      <input v-model="guess" placeholder="请输入您的猜测" />
-      <button @click="submitGuess">提交猜测</button>
+  <div>
+    <canvas ref="canvas"></canvas>
+    <div class="chat-window">
+      <div v-for="message in chatMessages" :key="message.id">
+        {{ message.text }}
+      </div>
     </div>
+    <div class="chat-input">
+      <input v-model="inputMessage" placeholder="输入消息" @keyup.enter="sendMessage" />
+      <button @click="sendMessage">发送</button>
     </div>
-  </template>
-  
-  <script>
-  import socket from '../websocket';
-  
-  export default {
-    data() {
-      return {
-        context: null,
-        guess: '',
-      };
-    },
-    mounted() {
-      this.context = this.$refs.canvas.getContext('2d');
-      this.$refs.canvas.width = this.$refs.canvas.offsetWidth;
-      this.$refs.canvas.height = this.$refs.canvas.offsetHeight;
-    },
-    methods: {
-      drawLine(x1, y1, x2, y2) {
-        this.context.beginPath();
-        this.context.moveTo(x1, y1);
-        this.context.lineTo(x2, y2);
-        this.context.stroke();
-      },
-      submitGuess() {
-      socket.send(JSON.stringify({ type: 'guess', guess: this.guess }));
+  </div>
+</template>
+
+<script>
+import socket from '../websocket';
+
+export default {
+  data() {
+    return {
+      context: null,
+      guess: '',
+      chatMessages: [],
+      inputMessage: '',
+    };
   },
-    },
-    created() {
-      socket.addEventListener('message', (event) => {
-        const data = JSON.parse(event.data);
-  
+  mounted() {
+    this.context = this.$refs.canvas.getContext('2d');
+    this.$refs.canvas.width = this.$refs.canvas.offsetWidth;
+    this.$refs.canvas.height = this.$refs.canvas.offsetHeight;
+    socket.addEventListener('message', this.handleSocketMessage);
+  },
+  beforeUnmount() {
+    socket.removeEventListener('message', this.handleSocketMessage);
+  },
+  methods: {
+    async handleSocketMessage(event) {
+      if (event.data instanceof Blob) {
+        console.log('Received raw data:', event.data);
+        const text = await event.data.text();
+        const data = JSON.parse(text);
+
         if (data.type === 'draw') {
-          const { x1, y1, x2, y2 } = data;
-          this.drawLine(x1, y1, x2, y2);
+          this.drawLine(data.x1, data.y1, data.x2, data.y2);
+        } else if (data.type === 'chat') {
+          this.handleChatMessage(data.message);
+        } else {
+          console.log(`Unknown message type: ${data.type}`);
         }
-      });
+      } else {
+        console.log('Received non-Blob data:', event.data);
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'chat') {
+          this.handleChatMessage(data.message);
+        } else {
+          console.log(`Unknown message type: ${data.type}`);
+        }
+      }
     },
-  };
-  </script>
-  
-  <style>
-  canvas {
-    border: 1px solid black;
-    width: 500px;
-    height: 300px;
-  }
-  </style>
+    drawLine(x1, y1, x2, y2) {
+      this.context.beginPath();
+      this.context.moveTo(x1, y1);
+      this.context.lineTo(x2, y2);
+      this.context.stroke();
+    },
+    submitGuess() {
+      socket.send(JSON.stringify({ type: 'guess', guess: this.guess }));
+    },
+    handleChatMessage(message) {
+      this.chatMessages.push({ id: Date.now(), text: message });
+    },
+    sendMessage() {
+      socket.send(JSON.stringify({ type: 'chat', message: this.inputMessage }));
+      this.inputMessage = '';
+    },
+  },
+};
+</script>
+
+<style>
+canvas {
+  border: 1px solid black;
+  width: 500px;
+  height: 300px;
+}
+.guess-input {
+  display: flex;
+  margin-top: 10px;
+}
+.guess-input input {
+  flex-grow: 1;
+}
+.chat-window {
+  border: 1px solid black;
+  width: 500px;
+  height: 200px;
+  overflow-y: scroll;
+  margin-top: auto;
+}
+</style>

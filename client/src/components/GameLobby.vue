@@ -1,14 +1,13 @@
-<!-- GameLobby.vue -->
 <template>
   <div>
     <h1>游戏大厅</h1>
     <ul>
       <li v-for="room in rooms" :key="room.id">
+        <router-link :to="{ name: 'GameRoom', params: { roomId: room.id, nickname: nickname } }">加入房间 {{ room.id }}</router-link>
         <button @click="joinRoom(room.id)">加入房间 {{ room.id }}</button>
       </li>
     </ul>
     <button @click="createRoom">创建新房间</button>
-    <router-link v-if="id" :to="{ name: 'GameRoom', params: { roomId: room.id, nickname: nickname } }">加入房间 {{ room.id }}</router-link>
   </div>
 </template>
 
@@ -38,6 +37,9 @@ export default {
       switch (data.type) {
         case 'rooms_list':
           this.rooms = data.rooms;
+          break;
+        case 'room_created':
+          this.$router.push({ name: 'GameRoom', params: { roomId: data.roomId, nickname: this.nickname } });
           break;
         default:
           console.log(`Unknown message type: ${data.type}`);
