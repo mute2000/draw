@@ -49,21 +49,50 @@ function handleCreateRoom(socket, nickname) {
 }
 
 function handleJoinRoom(socket, roomId, nickname) {
-  const room = rooms.find((room) => room.id === roomId);
+  console.log(`Joining room ${roomId} ${typeof roomId} ${roomId === 1}`);
+  const room = rooms.find((room) => room.id === Number(roomId));
 
   if (room) {
-    const role = 'guesser';
-    room.players.push({ nickname: nickname, socket: socket, role: role });
+    const existingPlayer = room.players.find((player) => player.nickname === nickname);
+    if (existingPlayer) {
+    } else {
+      const role = 'guesser';
+      room.players.push({ nickname: nickname, socket: socket, role: role });
 
-    socket.send(JSON.stringify({ type: 'room_joined', roomId: roomId }));
+      socket.send(JSON.stringify({ type: 'room_joined', roomId: roomId }));
 
-    socket.send(JSON.stringify({ type: 'role_assigned', role: role }));
-    if (role === 'drawer') {
-      randomWord = getRandomWord();
-      socket.send(JSON.stringify({ type: 'word_assigned', word: randomWord }));
+      socket.send(JSON.stringify({ type: 'role_assigned', role: role }));
+      if (role === 'drawer') {
+        randomWord = getRandomWord();
+        socket.send(JSON.stringify({ type: 'word_assigned', word: randomWord }));
+      }
     }
   } else {
     socket.send(JSON.stringify({ type: 'room_join_failed', message: '房间不存在' }));
+  }
+}
+
+function handleDraw(socket, roomId, x1, y1, x2, y2) {
+  const room = rooms.find((room) => room.id === Number(roomId));
+
+  if (room) {
+    room.players.forEach((player) => {
+      if (player.socket !== socket && player.role === 'guesser' && player.socket.readyState === WebSocket.OPEN) {
+        player.socket.send(JSON.stringify({ type: 'draw', x1, y1, x2, y2 }));
+      }
+    });
+  }
+}
+
+function handleChat(socket, roomId, message) {
+  const room = rooms.find((room) => room.id === Number(roomId));
+
+  if (room) {
+    room.players.forEach((player) => {
+      if (player.socket.readyState === WebSocket.OPEN) {
+        player.socket.send(JSON.stringify({ type: 'chat', message }));
+      }
+    });
   }
 }
 
@@ -79,6 +108,7 @@ wss.on('connection', (ws) => {
 
     switch (data.type) {
       case 'set_nickname':
+        console.log(`Received nickname: ${data.nickname}`);
         handleSetNickname(ws, data.nickname);
         break;
       case 'get_rooms':
@@ -91,28 +121,10 @@ wss.on('connection', (ws) => {
         handleJoinRoom(ws, data.roomId, data.nickname);
         break;
       case 'draw':
-        wss.clients.forEach((client) => {
-          if (client !== ws && client.readyState === WebSocket.OPEN) {
-            client.send(message);
-          }
-        });
-        break;
-      case 'guess':
-        const isCorrect = data.guess === randomWord;
-        ws.send(JSON.stringify({ type: 'guessResult', isCorrect }));
-
-        wss.clients.forEach((client) => {
-          if (client !== ws && client.readyState === WebSocket.OPEN) {
-            client.send(message);
-          }
-        });
+        handleDraw(ws, data.roomId, data.x1, data.y1, data.x2, data.y2);
         break;
       case 'chat':
-        wss.clients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
-          }
-        });
+        handleChat(ws, data.roomId, data.message);
         break;
 
       default:

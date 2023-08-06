@@ -68,15 +68,13 @@ export default {
       this.context.lineTo(x, y);
       this.context.stroke();
 
-      socket.send(
-        JSON.stringify({
-          type: 'draw',
-          x1: this.lastX,
-          y1: this.lastY,
-          x2: x,
-          y2: y,
-        })
-      );
+      this.$emit('drawEvent', {
+        type: 'draw',
+        x1: this.lastX,
+        y1: this.lastY,
+        x2: x,
+        y2: y,
+      });
 
       [this.lastX, this.lastY] = [x, y];
     },

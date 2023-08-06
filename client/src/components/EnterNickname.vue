@@ -31,7 +31,6 @@ export default {
       console.log('nickname:', this.nickname);
       socket.send(JSON.stringify({ type: 'set_nickname', nickname: this.nickname }));
 
-      this.$router.push({ name: 'GameLobby', params: { nickname: this.nickname } });
     },
     handleSocketMessage(event) {
       const data = JSON.parse(event.data);

@@ -52,7 +52,9 @@ export default {
         console.log('Received non-Blob data:', event.data);
         const data = JSON.parse(event.data);
 
-        if (data.type === 'chat') {
+        if (data.type === 'draw') {
+          this.drawLine(data.x1, data.y1, data.x2, data.y2);
+        } else if (data.type === 'chat') {
           this.handleChatMessage(data.message);
         } else {
           console.log(`Unknown message type: ${data.type}`);
@@ -66,12 +68,30 @@ export default {
       this.context.stroke();
     },
     submitGuess() {
+      this.$emit('guessEvent', {
+        type: 'guess',
+        guess: this.guess,
+      });
+
       socket.send(JSON.stringify({ type: 'guess', guess: this.guess }));
     },
     handleChatMessage(message) {
       this.chatMessages.push({ id: Date.now(), text: message });
     },
+    handleGuessResult(isCorrect) {
+      if (isCorrect) {
+        alert('恭喜你，猜对了！');
+      } else {
+        alert('很遗憾，猜错了。');
+      }
+    },
+
     sendMessage() {
+      this.$emit('chatEvent', {
+        type: 'chat',
+        message: this.inputMessage,
+      });
+
       socket.send(JSON.stringify({ type: 'chat', message: this.inputMessage }));
       this.inputMessage = '';
     },

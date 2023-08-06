@@ -41,6 +41,9 @@ export default {
         case 'room_created':
           this.$router.push({ name: 'GameRoom', params: { roomId: data.roomId, nickname: this.nickname } });
           break;
+        case 'room_joined':
+          this.$router.push({ name: 'GameRoom', params: { roomId: data.roomId, nickname: this.nickname } });
+          break;
         default:
           console.log(`Unknown message type: ${data.type}`);
       }
@@ -49,7 +52,7 @@ export default {
       socket.send(JSON.stringify({ type: 'create_room', nickname: this.nickname }));
     },
     joinRoom(roomId) {
-      socket.send(JSON.stringify({ type: 'join_room', roomId: roomId, nickname: this.nickname }));
+      socket.send(JSON.stringify({ type: 'join_room', roomId: Number(roomId), nickname: this.nickname }));
     },
   },
 };
