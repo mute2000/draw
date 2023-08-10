@@ -46,10 +46,11 @@ function handleCreateRoom(socket, nickname) {
 
   const randomWord = getRandomWord();
   socket.send(JSON.stringify({ type: 'word_assigned', word: randomWord }));
+  newRoom.players[0].word = randomWord;
 }
 
 function handleJoinRoom(socket, roomId, nickname) {
-  console.log(`Joining room ${roomId} ${typeof roomId} ${roomId === 1}`);
+ 
   const room = rooms.find((room) => room.id === Number(roomId));
 
   if (room) {
@@ -88,19 +89,56 @@ function handleChat(socket, roomId, message) {
   const room = rooms.find((room) => room.id === Number(roomId));
 
   if (room) {
+    const drawer = room.players.find((player) => player.role === 'drawer');
+    const isCorrect = message === drawer.word;
+
     room.players.forEach((player) => {
       if (player.socket.readyState === WebSocket.OPEN) {
         player.socket.send(JSON.stringify({ type: 'chat', message }));
       }
     });
+
+    if (isCorrect) {
+      room.players.forEach((player) => {
+        if (player.socket.readyState === WebSocket.OPEN) {
+          player.socket.send(JSON.stringify({ type: 'chat', message: '猜对了' }));
+        }
+      });
+      startNewRound(room);
+    }
   }
 }
+
+function startNewRound(room) {
+  room.players.forEach((player) => {
+    if (player.socket.readyState === WebSocket.OPEN) {
+      player.socket.send(JSON.stringify({ type: 'clear_canvas' }));
+    }
+  });
+
+  const drawerIndex = room.players.findIndex((player) => player.role === 'drawer');
+  room.players[drawerIndex].role = 'guesser';
+
+  const newDrawerIndex = (drawerIndex + 1) % room.players.length;
+  room.players[newDrawerIndex].role = 'drawer';
+
+  const randomWord = getRandomWord();
+  room.players[newDrawerIndex].socket.send(JSON.stringify({ type: 'word_assigned', word: randomWord }));
+  room.players[newDrawerIndex].word = randomWord;
+
+  room.players.forEach((player) => {
+    if (player.socket.readyState === WebSocket.OPEN) {
+      player.socket.send(JSON.stringify({ type: 'role_assigned', role: player.role }));
+    }
+  });
+}
+
 
 wss.on('connection', (ws) => {
   console.log('Client connected');
 
   let drawer = null;
-  let randomWord = null;
+
 
   ws.on('message', (message) => {
     console.log(`Received message: ${message}`);
@@ -125,7 +163,7 @@ wss.on('connection', (ws) => {
         break;
       case 'chat':
         handleChat(ws, data.roomId, data.message);
-        break;
+        break;     
 
       default:
         console.log(`Unknown message type: ${data.type}`);

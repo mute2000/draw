@@ -9,6 +9,7 @@
 import socket from '../websocket';
 
 export default {
+  props: ['word'],
   data() {
     return {
       drawing: false,
@@ -16,7 +17,6 @@ export default {
       lastX: 0,
       lastY: 0,
       canvasBounds: null,
-      word: '',
     };
   },
   mounted() {
@@ -30,28 +30,15 @@ export default {
     socket.removeEventListener('message', this.handleSocketMessage);
   },
   methods: {
-    async handleSocketMessage(event) {
-      if (event.data instanceof Blob) {
-        console.log('Received raw data:', event.data);
-        const text = await event.data.text();
-        const data = JSON.parse(text);
+    handleSocketMessage(event) {
+      const data = JSON.parse(event.data);
 
-        if (data.type === 'word_assigned') {
-          this.word = data.word;
-        } else {
+      switch (data.type) {
+        case 'clear_canvas':
+          this.clearCanvas();
+          break;
+        default:
           console.log(`Unknown message type: ${data.type}`);
-        }
-      } else {
-        console.log('Received non-Blob data:', event.data);
-        const data = JSON.parse(event.data);
-
-        switch (data.type) {
-          case 'word_assigned':
-            this.word = data.word;
-            break;
-          default:
-            console.log(`Unknown message type: ${data.type}`);
-        }
       }
     },
     startDrawing(event) {
@@ -81,14 +68,9 @@ export default {
     stopDrawing() {
       this.drawing = false;
     },
+    clearCanvas() {
+      this.context.clearRect(0, 0, this.context.canvas.width, this.context.canvas.height);
+    },
   },
 };
 </script>
-
-<style>
-canvas {
-  border: 1px solid black;
-  width: 500px;
-  height: 300px;
-}
-</style>

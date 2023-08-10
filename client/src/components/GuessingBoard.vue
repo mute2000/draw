@@ -1,15 +1,6 @@
 <template>
   <div>
     <canvas ref="canvas"></canvas>
-    <div class="chat-window">
-      <div v-for="message in chatMessages" :key="message.id">
-        {{ message.text }}
-      </div>
-    </div>
-    <div class="chat-input">
-      <input v-model="inputMessage" placeholder="输入消息" @keyup.enter="sendMessage" />
-      <button @click="sendMessage">发送</button>
-    </div>
   </div>
 </template>
 
@@ -23,6 +14,7 @@ export default {
       guess: '',
       chatMessages: [],
       inputMessage: '',
+      isDrawer: false,
     };
   },
   mounted() {
@@ -45,6 +37,8 @@ export default {
           this.drawLine(data.x1, data.y1, data.x2, data.y2);
         } else if (data.type === 'chat') {
           this.handleChatMessage(data.message);
+        } else if (data.type === 'clear_canvas') {
+          this.clearCanvas();
         } else {
           console.log(`Unknown message type: ${data.type}`);
         }
@@ -78,14 +72,6 @@ export default {
     handleChatMessage(message) {
       this.chatMessages.push({ id: Date.now(), text: message });
     },
-    handleGuessResult(isCorrect) {
-      if (isCorrect) {
-        alert('恭喜你，猜对了！');
-      } else {
-        alert('很遗憾，猜错了。');
-      }
-    },
-
     sendMessage() {
       this.$emit('chatEvent', {
         type: 'chat',
@@ -95,28 +81,9 @@ export default {
       socket.send(JSON.stringify({ type: 'chat', message: this.inputMessage }));
       this.inputMessage = '';
     },
+    clearCanvas() {
+      this.context.clearRect(0, 0, this.context.canvas.width, this.context.canvas.height);
+    },
   },
 };
 </script>
-
-<style>
-canvas {
-  border: 1px solid black;
-  width: 500px;
-  height: 300px;
-}
-.guess-input {
-  display: flex;
-  margin-top: 10px;
-}
-.guess-input input {
-  flex-grow: 1;
-}
-.chat-window {
-  border: 1px solid black;
-  width: 500px;
-  height: 200px;
-  overflow-y: scroll;
-  margin-top: auto;
-}
-</style>
